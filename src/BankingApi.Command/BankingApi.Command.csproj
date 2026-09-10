@@ -1,5 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <ProjectReference Include="..\BankingApi.DTO\BankingApi.DTO.csproj" />
+    <ProjectReference Include="..\BankingApi.Infrastructure\BankingApi.Infrastructure.csproj" />
+    <ProjectReference Include="..\BankingApi.Shared\BankingApi.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

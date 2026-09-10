@@ -1,5 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <ProjectReference Include="..\BankingApi.Command\BankingApi.Command.csproj" />
+    <ProjectReference Include="..\BankingApi.Query\BankingApi.Query.csproj" />
+    <ProjectReference Include="..\BankingApi.DTO\BankingApi.DTO.csproj" />
+    <ProjectReference Include="..\BankingApi.Shared\BankingApi.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
