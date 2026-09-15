@@ -2,6 +2,7 @@ using BankingApi.DTO.Customers;
 using BankingApi.Infrastructure.Entity;
 using BankingApi.Infrastructure.IRepository;
 using BankingApi.Shared.Contracts;
+using BankingApi.Shared.Exceptions;
 
 namespace BankingApi.Command.Customers;
 
@@ -10,11 +11,17 @@ public class CreateCustomerCommandHandler(ICustomerRepository customerRepository
 {
     public async Task<CustomerResponse> Handle(CreateCustomerCommand request, CancellationToken cancellationToken = default)
     {
+        var email = request.Customer.Email.Trim();
+        if (await customerRepository.ExistsByEmailAsync(email, cancellationToken))
+        {
+            throw new EmailAlreadyExistsException(email);
+        }
+
         var customer = new Customer
         {
             FirstName = request.Customer.FirstName.Trim(),
             LastName = request.Customer.LastName.Trim(),
-            Email = request.Customer.Email.Trim(),
+            Email = email,
             PhoneNumber = string.IsNullOrWhiteSpace(request.Customer.PhoneNumber)
                 ? null
                 : request.Customer.PhoneNumber.Trim(),

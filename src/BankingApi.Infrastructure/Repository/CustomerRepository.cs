@@ -21,6 +21,12 @@ public class CustomerRepository(BankingContext context) : ICustomerRepository
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
     }
 
+    public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        return await context.Customers
+            .AnyAsync(c => c.Email.ToLower() == email.ToLower(), cancellationToken);
+    }
+
     public async Task<Customer> AddAsync(Customer customer, CancellationToken cancellationToken = default)
     {
         await context.Customers.AddAsync(customer, cancellationToken);
