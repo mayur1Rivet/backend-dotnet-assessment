@@ -5,11 +5,18 @@ using BankingApi.Shared.Contracts;
 
 namespace BankingApi.Command.Accounts;
 
-public class CreateAccountCommandHandler(IAccountRepository accountRepository)
+public class CreateAccountCommandHandler(
+    IAccountRepository accountRepository,
+    ICustomerRepository customerRepository)
     : IRequestHandler<CreateAccountCommand, AccountResponse>
 {
     public async Task<AccountResponse> Handle(CreateAccountCommand request, CancellationToken cancellationToken = default)
     {
+        if (await customerRepository.GetByIdAsync(request.Account.CustomerId, cancellationToken) is null)
+        {
+            throw new KeyNotFoundException($"Customer with id {request.Account.CustomerId} was not found.");
+        }
+
         var account = new Account
         {
             CustomerId = request.Account.CustomerId,

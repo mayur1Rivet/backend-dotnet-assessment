@@ -11,7 +11,7 @@ public class DeleteAccountCommandHandler(IAccountRepository accountRepository)
         var account = await accountRepository.GetByIdAsync(request.Id, cancellationToken);
         if (account is null)
         {
-            return false;
+            throw new KeyNotFoundException($"Account with id {request.Id} was not found.");
         }
 
         await accountRepository.DeleteAsync(account, cancellationToken);

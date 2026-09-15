@@ -12,11 +12,8 @@ public class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountComm
         RuleFor(x => x.Account)
             .NotNull();
 
-        RuleFor(x => x.Account.AccountType)
-            .NotEmpty()
-            .MaximumLength(50);
-
-        RuleFor(x => x.Account.Balance)
-            .GreaterThanOrEqualTo(0m);
+        this.AddAccountFieldRules(
+            x => x.Account.AccountType,
+            x => x.Account.Balance);
     }
 }

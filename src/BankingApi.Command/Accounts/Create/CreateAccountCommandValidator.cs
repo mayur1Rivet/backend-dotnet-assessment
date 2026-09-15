@@ -13,11 +13,8 @@ public class CreateAccountCommandValidator : AbstractValidator<CreateAccountComm
         RuleFor(x => x.Account.CustomerId)
             .GreaterThan(0);
 
-        RuleFor(x => x.Account.AccountType)
-            .NotEmpty()
-            .MaximumLength(50);
-
-        RuleFor(x => x.Account.Balance)
-            .GreaterThanOrEqualTo(0m);
+        this.AddAccountFieldRules(
+            x => x.Account.AccountType,
+            x => x.Account.Balance);
     }
 }
