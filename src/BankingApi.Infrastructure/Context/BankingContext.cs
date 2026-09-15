@@ -7,12 +7,23 @@ public class BankingContext(DbContextOptions<BankingContext> options) : DbContex
 {
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Customer>()
             .HasIndex(c => c.Email)
             .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .HasIndex(user => user.Email)
+            .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .HasOne(user => user.Customer)
+            .WithOne()
+            .HasForeignKey<User>(user => user.CustomerId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Account>()
             .HasIndex(a => a.AccountNumber)

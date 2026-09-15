@@ -2,6 +2,7 @@ using BankingApi.DTO.Accounts;
 using BankingApi.Infrastructure.Entity;
 using BankingApi.Infrastructure.IRepository;
 using BankingApi.Shared.Contracts;
+using System.Security.Cryptography;
 
 namespace BankingApi.Command.Accounts;
 
@@ -42,7 +43,6 @@ public class CreateAccountCommandHandler(
 
     private static string GenerateAccountNumber()
     {
-        var random = new Random();
-        return $"ACC-{random.Next(100000, 999999)}";
+        return $"ACC-{RandomNumberGenerator.GetInt32(100000, 1000000)}";
     }
 }

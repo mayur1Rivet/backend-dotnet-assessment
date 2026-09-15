@@ -1,18 +1,29 @@
 using BankingApi.Command.Customers;
 using BankingApi.DTO.Customers;
 using BankingApi.DTO.Errors;
+using BankingApi.Infrastructure.IRepository;
 using BankingApi.Query.Customers;
 using BankingApi.Shared.Contracts;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace BankingApi.API.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
-public class CustomersController(ISender sender, IValidator<CreateCustomerCommand> createValidator, IValidator<UpdateCustomerCommand> updateValidator) : ControllerBase
+public class CustomersController(
+    ISender sender,
+    ICustomerRepository customerRepository,
+    IValidator<CreateCustomerCommand> createValidator,
+    IValidator<UpdateCustomerCommand> updateValidator) : ControllerBase
 {
+    private const string CustomerNotFoundCode = "CUSTOMER_NOT_FOUND";
+
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<IEnumerable<CustomerResponse>>> GetAll(CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetAllCustomersQuery(), cancellationToken);
@@ -22,12 +33,17 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
     [HttpGet("{id:int}")]
     public async Task<ActionResult<CustomerResponse>> GetById(int id, CancellationToken cancellationToken)
     {
+        if (!IsAdmin() && !OwnsCustomer(id))
+        {
+            return Forbid();
+        }
+
         var customer = await sender.Send(new GetCustomerByIdQuery(id), cancellationToken);
         if (customer is null)
         {
             return NotFound(new ErrorResponse(
                 StatusCodes.Status404NotFound,
-                "CUSTOMER_NOT_FOUND",
+                CustomerNotFoundCode,
                 $"Customer with id {id} was not found.",
                 TraceId: HttpContext.TraceIdentifier));
         }
@@ -36,6 +52,7 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<CustomerResponse>> Create([FromBody] CreateCustomerDto dto, CancellationToken cancellationToken)
     {
         var command = new CreateCustomerCommand(dto);
@@ -63,6 +80,16 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
     [HttpPut("{id:int}")]
     public async Task<ActionResult<CustomerResponse>> Update(int id, [FromBody] UpdateCustomerDto dto, CancellationToken cancellationToken)
     {
+        if (await customerRepository.GetByIdAsync(id, cancellationToken) is null)
+        {
+            return NotFound(new ErrorResponse(StatusCodes.Status404NotFound, CustomerNotFoundCode, $"Customer with id {id} was not found.", TraceId: HttpContext.TraceIdentifier));
+        }
+
+        if (!IsAdmin() && !OwnsCustomer(id))
+        {
+            return Forbid();
+        }
+
         var command = new UpdateCustomerCommand(id, dto);
         var validationResult = await updateValidator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
@@ -90,7 +117,7 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
         {
             return NotFound(new ErrorResponse(
                 StatusCodes.Status404NotFound,
-                "CUSTOMER_NOT_FOUND",
+                CustomerNotFoundCode,
                 $"Customer with id {id} was not found.",
                 TraceId: HttpContext.TraceIdentifier));
         }
@@ -99,16 +126,26 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
+        if (!IsAdmin() && !OwnsCustomer(id))
+        {
+            return Forbid();
+        }
+
         var deleted = await sender.Send(new DeleteCustomerCommand(id), cancellationToken);
         if (!deleted)
         {
             return NotFound(new ErrorResponse(
                 StatusCodes.Status404NotFound,
-                "CUSTOMER_NOT_FOUND",
+                CustomerNotFoundCode,
                 $"Customer with id {id} was not found.",
                 TraceId: HttpContext.TraceIdentifier));
         }
 
         return NoContent();
     }
+
+    private bool IsAdmin() => User.IsInRole("Admin");
+
+    private bool OwnsCustomer(int customerId) =>
+        int.TryParse(User.FindFirstValue("customer_id"), out var currentCustomerId) && currentCustomerId == customerId;
 }

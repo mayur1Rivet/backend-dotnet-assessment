@@ -16,6 +16,7 @@ public static class InfrastructureExtensions
 
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
 
         return services;
     }

@@ -1,18 +1,29 @@
 using BankingApi.Command.Accounts;
 using BankingApi.DTO.Accounts;
 using BankingApi.DTO.Errors;
+using BankingApi.Infrastructure.IRepository;
 using BankingApi.Query.Accounts;
 using BankingApi.Shared.Contracts;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace BankingApi.API.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
-public class AccountsController(ISender sender, IValidator<CreateAccountCommand> createValidator, IValidator<UpdateAccountCommand> updateValidator) : ControllerBase
+public class AccountsController(
+    ISender sender,
+    IAccountRepository accountRepository,
+    IValidator<CreateAccountCommand> createValidator,
+    IValidator<UpdateAccountCommand> updateValidator) : ControllerBase
 {
+    private const string AccountNotFoundCode = "ACCOUNT_NOT_FOUND";
+
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<IEnumerable<AccountResponse>>> GetAll(CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetAllAccountsQuery(), cancellationToken);
@@ -22,6 +33,11 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
     [HttpGet("customer/{customerId:int}")]
     public async Task<ActionResult<IEnumerable<AccountResponse>>> GetByCustomerId(int customerId, CancellationToken cancellationToken)
     {
+        if (!IsAdmin() && !OwnsCustomer(customerId))
+        {
+            return Forbid();
+        }
+
         var accounts = await sender.Send(new GetAccountsByCustomerIdQuery(customerId), cancellationToken);
         return Ok(accounts);
     }
@@ -32,11 +48,12 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
         var account = await sender.Send(new GetAccountByIdQuery(id), cancellationToken);
         if (account is null)
         {
-            return NotFound(new ErrorResponse(
-                StatusCodes.Status404NotFound,
-                "ACCOUNT_NOT_FOUND",
-                $"Account with id {id} was not found.",
-                TraceId: HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(StatusCodes.Status404NotFound, AccountNotFoundCode, $"Account with id {id} was not found.", TraceId: HttpContext.TraceIdentifier));
+        }
+
+        if (!IsAdmin() && !OwnsCustomer(account.CustomerId))
+        {
+            return Forbid();
         }
 
         return Ok(account);
@@ -45,6 +62,11 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
     [HttpPost]
     public async Task<ActionResult<AccountResponse>> Create([FromBody] CreateAccountDto dto, CancellationToken cancellationToken)
     {
+        if (!IsAdmin() && !OwnsCustomer(dto.CustomerId))
+        {
+            return Forbid();
+        }
+
         var command = new CreateAccountCommand(dto);
         var validationResult = await createValidator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
@@ -70,6 +92,17 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
     [HttpPut("{id:int}")]
     public async Task<ActionResult<AccountResponse>> Update(int id, [FromBody] UpdateAccountDto dto, CancellationToken cancellationToken)
     {
+        var existingAccount = await accountRepository.GetByIdAsync(id, cancellationToken);
+        if (existingAccount is null)
+        {
+            return NotFound(new ErrorResponse(StatusCodes.Status404NotFound, AccountNotFoundCode, $"Account with id {id} was not found.", TraceId: HttpContext.TraceIdentifier));
+        }
+
+        if (!IsAdmin() && !OwnsCustomer(existingAccount.CustomerId))
+        {
+            return Forbid();
+        }
+
         var command = new UpdateAccountCommand(id, dto);
         var validationResult = await updateValidator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
@@ -97,7 +130,7 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
         {
             return NotFound(new ErrorResponse(
                 StatusCodes.Status404NotFound,
-                "ACCOUNT_NOT_FOUND",
+                AccountNotFoundCode,
                 $"Account with id {id} was not found.",
                 TraceId: HttpContext.TraceIdentifier));
         }
@@ -106,16 +139,32 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
+        var existingAccount = await accountRepository.GetByIdAsync(id, cancellationToken);
+        if (existingAccount is null)
+        {
+            return NotFound(new ErrorResponse(StatusCodes.Status404NotFound, AccountNotFoundCode, $"Account with id {id} was not found.", TraceId: HttpContext.TraceIdentifier));
+        }
+
+        if (!IsAdmin() && !OwnsCustomer(existingAccount.CustomerId))
+        {
+            return Forbid();
+        }
+
         var deleted = await sender.Send(new DeleteAccountCommand(id), cancellationToken);
         if (!deleted)
         {
             return NotFound(new ErrorResponse(
                 StatusCodes.Status404NotFound,
-                "ACCOUNT_NOT_FOUND",
+                AccountNotFoundCode,
                 $"Account with id {id} was not found.",
                 TraceId: HttpContext.TraceIdentifier));
         }
 
         return NoContent();
     }
+
+    private bool IsAdmin() => User.IsInRole("Admin");
+
+    private bool OwnsCustomer(int customerId) =>
+        int.TryParse(User.FindFirstValue("customer_id"), out var currentCustomerId) && currentCustomerId == customerId;
 }

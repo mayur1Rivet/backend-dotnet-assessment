@@ -26,6 +26,7 @@ public sealed class ErrorHandlingMiddleware(RequestDelegate next, ILogger<ErrorH
         var (statusCode, errorCode, message) = exception switch
         {
             EmailAlreadyExistsException => (StatusCodes.Status400BadRequest, "EMAIL_ALREADY_EXISTS", exception.Message),
+            InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "INVALID_CREDENTIALS", exception.Message),
             KeyNotFoundException => (StatusCodes.Status404NotFound, "RESOURCE_NOT_FOUND", exception.Message),
             ArgumentException => (StatusCodes.Status400BadRequest, "INVALID_ARGUMENT", exception.Message),
             _ => (StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR", "An unexpected error occurred.")

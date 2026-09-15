@@ -1,15 +1,39 @@
 using BankingApi.API.Middleware;
 using BankingApi.DTO.Errors;
+using BankingApi.Infrastructure.Context;
+using BankingApi.Infrastructure.Entity;
 using BankingApi.AppService.Extensions;
 using BankingApi.Infrastructure.Extensions;
 using BankingApi.Shared.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSharedServices();
 builder.Services.AddAppServices();
+var jwtSettings = builder.Configuration.GetSection("Jwt");
+var jwtKey = jwtSettings["Key"] ?? throw new InvalidOperationException("JWT signing key is not configured.");
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings["Issuer"],
+            ValidAudience = jwtSettings["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            RoleClaimType = System.Security.Claims.ClaimTypes.Role
+        };
+    });
 builder.Services.AddControllers()
 .ConfigureApiBehaviorOptions(options =>
 {
@@ -34,6 +58,35 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var database = scope.ServiceProvider.GetRequiredService<BankingContext>();
+    await database.Database.MigrateAsync();
+
+    var adminEmail = builder.Configuration["Admin:Email"]?.Trim();
+    var adminPassword = builder.Configuration["Admin:Password"];
+    if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword) &&
+        !await database.Users.AnyAsync(user => user.Email.ToLower() == adminEmail.ToLower()))
+    {
+        var customer = new Customer
+        {
+            FirstName = "System",
+            LastName = "Administrator",
+            Email = adminEmail,
+            CreatedAt = DateTime.UtcNow
+        };
+        var user = new User
+        {
+            Email = adminEmail,
+            Role = "Admin",
+            Customer = customer
+        };
+        user.PasswordHash = scope.ServiceProvider.GetRequiredService<IPasswordHasher<User>>().HashPassword(user, adminPassword);
+        database.Users.Add(user);
+        await database.SaveChangesAsync();
+    }
+}
 
 app.UseStatusCodePages(async statusCodeContext =>
 {
@@ -73,6 +126,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
