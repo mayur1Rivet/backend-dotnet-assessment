@@ -1,5 +1,6 @@
 using BankingApi.Command.Accounts;
 using BankingApi.DTO.Accounts;
+using BankingApi.DTO.Errors;
 using BankingApi.Query.Accounts;
 using BankingApi.Shared.Contracts;
 using FluentValidation;
@@ -31,7 +32,11 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
         var account = await sender.Send(new GetAccountByIdQuery(id), cancellationToken);
         if (account is null)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse(
+                StatusCodes.Status404NotFound,
+                "ACCOUNT_NOT_FOUND",
+                $"Account with id {id} was not found.",
+                TraceId: HttpContext.TraceIdentifier));
         }
 
         return Ok(account);
@@ -44,14 +49,18 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
         var validationResult = await createValidator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var problem = new ValidationProblemDetails(
-                validationResult.Errors
+            var details = validationResult.Errors
                     .GroupBy(e => e.PropertyName)
                     .ToDictionary(
                         g => g.Key,
-                        g => g.Select(e => e.ErrorMessage).ToArray()));
+                        g => g.Select(e => e.ErrorMessage).ToArray());
 
-            return ValidationProblem(problem);
+            return BadRequest(new ErrorResponse(
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "One or more validation errors occurred.",
+                details,
+                HttpContext.TraceIdentifier));
         }
 
         var created = await sender.Send(command, cancellationToken);
@@ -65,14 +74,18 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
         var validationResult = await updateValidator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var problem = new ValidationProblemDetails(
-                validationResult.Errors
+            var details = validationResult.Errors
                     .GroupBy(e => e.PropertyName)
                     .ToDictionary(
                         g => g.Key,
-                        g => g.Select(e => e.ErrorMessage).ToArray()));
+                        g => g.Select(e => e.ErrorMessage).ToArray());
 
-            return ValidationProblem(problem);
+            return BadRequest(new ErrorResponse(
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "One or more validation errors occurred.",
+                details,
+                HttpContext.TraceIdentifier));
         }
 
         try
@@ -82,7 +95,11 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
         }
         catch (KeyNotFoundException)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse(
+                StatusCodes.Status404NotFound,
+                "ACCOUNT_NOT_FOUND",
+                $"Account with id {id} was not found.",
+                TraceId: HttpContext.TraceIdentifier));
         }
     }
 
@@ -92,7 +109,11 @@ public class AccountsController(ISender sender, IValidator<CreateAccountCommand>
         var deleted = await sender.Send(new DeleteAccountCommand(id), cancellationToken);
         if (!deleted)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse(
+                StatusCodes.Status404NotFound,
+                "ACCOUNT_NOT_FOUND",
+                $"Account with id {id} was not found.",
+                TraceId: HttpContext.TraceIdentifier));
         }
 
         return NoContent();

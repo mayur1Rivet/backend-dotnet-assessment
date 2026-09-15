@@ -1,5 +1,6 @@
 using BankingApi.Command.Customers;
 using BankingApi.DTO.Customers;
+using BankingApi.DTO.Errors;
 using BankingApi.Query.Customers;
 using BankingApi.Shared.Contracts;
 using FluentValidation;
@@ -24,7 +25,11 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
         var customer = await sender.Send(new GetCustomerByIdQuery(id), cancellationToken);
         if (customer is null)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse(
+                StatusCodes.Status404NotFound,
+                "CUSTOMER_NOT_FOUND",
+                $"Customer with id {id} was not found.",
+                TraceId: HttpContext.TraceIdentifier));
         }
 
         return Ok(customer);
@@ -37,14 +42,18 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
         var validationResult = await createValidator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var problem = new ValidationProblemDetails(
-                validationResult.Errors
+            var details = validationResult.Errors
                     .GroupBy(e => e.PropertyName)
                     .ToDictionary(
                         g => g.Key,
-                        g => g.Select(e => e.ErrorMessage).ToArray()));
+                        g => g.Select(e => e.ErrorMessage).ToArray());
 
-            return ValidationProblem(problem);
+            return BadRequest(new ErrorResponse(
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "One or more validation errors occurred.",
+                details,
+                HttpContext.TraceIdentifier));
         }
 
         var created = await sender.Send(command, cancellationToken);
@@ -58,14 +67,18 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
         var validationResult = await updateValidator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var problem = new ValidationProblemDetails(
-                validationResult.Errors
+            var details = validationResult.Errors
                     .GroupBy(e => e.PropertyName)
                     .ToDictionary(
                         g => g.Key,
-                        g => g.Select(e => e.ErrorMessage).ToArray()));
+                        g => g.Select(e => e.ErrorMessage).ToArray());
 
-            return ValidationProblem(problem);
+            return BadRequest(new ErrorResponse(
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "One or more validation errors occurred.",
+                details,
+                HttpContext.TraceIdentifier));
         }
 
         try
@@ -75,7 +88,11 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
         }
         catch (KeyNotFoundException)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse(
+                StatusCodes.Status404NotFound,
+                "CUSTOMER_NOT_FOUND",
+                $"Customer with id {id} was not found.",
+                TraceId: HttpContext.TraceIdentifier));
         }
     }
 
@@ -85,7 +102,11 @@ public class CustomersController(ISender sender, IValidator<CreateCustomerComman
         var deleted = await sender.Send(new DeleteCustomerCommand(id), cancellationToken);
         if (!deleted)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse(
+                StatusCodes.Status404NotFound,
+                "CUSTOMER_NOT_FOUND",
+                $"Customer with id {id} was not found.",
+                TraceId: HttpContext.TraceIdentifier));
         }
 
         return NoContent();
