@@ -3,16 +3,21 @@ using BankingApi.Infrastructure.Entity;
 using BankingApi.Infrastructure.IRepository;
 using BankingApi.Shared.Contracts;
 using BankingApi.Shared.Exceptions;
+using Microsoft.AspNetCore.Identity;
 
 namespace BankingApi.Command.Customers;
 
-public class CreateCustomerCommandHandler(ICustomerRepository customerRepository)
+public class CreateCustomerCommandHandler(
+    ICustomerRepository customerRepository,
+    IUserRepository userRepository,
+    IPasswordHasher<User> passwordHasher)
     : IRequestHandler<CreateCustomerCommand, CustomerResponse>
 {
     public async Task<CustomerResponse> Handle(CreateCustomerCommand request, CancellationToken cancellationToken = default)
     {
         var email = request.Customer.Email.Trim();
-        if (await customerRepository.ExistsByEmailAsync(email, cancellationToken))
+        if (await customerRepository.ExistsByEmailAsync(email, cancellationToken) ||
+            await userRepository.GetByEmailAsync(email, cancellationToken) is not null)
         {
             throw new EmailAlreadyExistsException(email);
         }
@@ -29,7 +34,15 @@ public class CreateCustomerCommandHandler(ICustomerRepository customerRepository
         };
 
         await customerRepository.AddAsync(customer, cancellationToken);
-        await customerRepository.SaveChangesAsync(cancellationToken);
+        var user = new User
+        {
+            Email = email,
+            Role = "Customer",
+            Customer = customer
+        };
+        user.PasswordHash = passwordHasher.HashPassword(user, request.Customer.Password);
+        await userRepository.AddAsync(user, cancellationToken);
+        await userRepository.SaveChangesAsync(cancellationToken);
 
         return new CustomerResponse
         {

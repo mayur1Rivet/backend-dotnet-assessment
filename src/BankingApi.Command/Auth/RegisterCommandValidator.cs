@@ -7,15 +7,7 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
 {
     public RegisterCommandValidator()
     {
-        RuleFor(command => command.User.Password)
-            .NotEmpty()
-            .MinimumLength(8)
-            .Matches("[A-Z]")
-            .WithMessage("Password must contain at least one uppercase letter.")
-            .Matches("[a-z]")
-            .WithMessage("Password must contain at least one lowercase letter.")
-            .Matches("[0-9]")
-            .WithMessage("Password must contain at least one digit.");
+        this.AddPasswordRules(command => command.User.Password);
 
         this.AddCustomerFieldRules(
             command => command.User.FirstName,

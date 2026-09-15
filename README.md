@@ -166,6 +166,8 @@ Request:
 
 New registrations receive the `Customer` role and are linked to a customer profile.
 
+Administrators creating a customer through `POST /api/customers` must also provide the customer's initial `password`. The API creates a linked `Customer` login with that password, so the customer can use the same email and password with `POST /api/auth/login`.
+
 ### Login
 
 ```http

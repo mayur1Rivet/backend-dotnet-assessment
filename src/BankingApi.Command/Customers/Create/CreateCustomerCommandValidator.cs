@@ -11,5 +11,7 @@ public class CreateCustomerCommandValidator : AbstractValidator<CreateCustomerCo
             x => x.Customer.LastName,
             x => x.Customer.Email,
             x => x.Customer.PhoneNumber);
+
+        this.AddPasswordRules(x => x.Customer.Password);
     }
 }

@@ -41,4 +41,19 @@ public static class CustomerValidationExtensions
             .WithMessage("Phone number must be a valid Indian mobile number with exactly 10 digits.")
             .When(context => !string.IsNullOrWhiteSpace(phoneNumberAccessor(context)));
     }
+
+    public static void AddPasswordRules<T>(
+        this AbstractValidator<T> validator,
+        Expression<Func<T, string>> password)
+    {
+        validator.RuleFor(password)
+            .NotEmpty()
+            .MinimumLength(8)
+            .Matches("[A-Z]")
+            .WithMessage("Password must contain at least one uppercase letter.")
+            .Matches("[a-z]")
+            .WithMessage("Password must contain at least one lowercase letter.")
+            .Matches("[0-9]")
+            .WithMessage("Password must contain at least one digit.");
+    }
 }
