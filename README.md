@@ -198,6 +198,94 @@ Response contains:
 
 The JWT includes the user ID, customer ID, email, and role claims.
 
+### Admin creates a customer, then the customer logs in
+
+The following example shows the complete flow. The administrator creates both the customer profile and its login user. The `password` supplied in the customer-create request becomes the customer's initial login password.
+
+#### 1. Log in as the administrator
+
+```bash
+curl -X POST http://localhost:5130/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@banking.local",
+    "password": "Admin@12345"
+  }'
+```
+
+Copy the returned `accessToken` as `ADMIN_TOKEN`.
+
+#### 2. Create the customer as administrator
+
+```bash
+curl -X POST http://localhost:5130/api/customers \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Asha",
+    "lastName": "Sharma",
+    "email": "asha.sharma@example.com",
+    "phoneNumber": "9876543210",
+    "password": "AshaPass1"
+  }'
+```
+
+The response creates a customer such as:
+
+```json
+{
+  "id": 2,
+  "firstName": "Asha",
+  "lastName": "Sharma",
+  "email": "asha.sharma@example.com",
+  "phoneNumber": "9876543210"
+}
+```
+
+The API also creates a linked login user with the `Customer` role. The password is hashed and is never returned in the response.
+
+#### 3. Log in as the newly created customer
+
+Use the same email and password supplied by the administrator:
+
+```bash
+curl -X POST http://localhost:5130/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "asha.sharma@example.com",
+    "password": "AshaPass1"
+  }'
+```
+
+Copy this response's `accessToken` as `CUSTOMER_TOKEN` and note the returned `customerId`.
+
+#### 4. Use the customer token
+
+The customer can now access their own profile and accounts:
+
+```bash
+curl http://localhost:5130/api/customers/2 \
+  -H "Authorization: Bearer CUSTOMER_TOKEN"
+
+curl http://localhost:5130/api/accounts/customer/2 \
+  -H "Authorization: Bearer CUSTOMER_TOKEN"
+```
+
+The customer can also create an account for their own `customerId`:
+
+```bash
+curl -X POST http://localhost:5130/api/accounts \
+  -H "Authorization: Bearer CUSTOMER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerId": 2,
+    "accountType": "Savings",
+    "balance": 1000.00
+  }'
+```
+
+Using `CUSTOMER_TOKEN` with another customer's ID returns JSON HTTP `403 Forbidden`.
+
 ## Roles and Authorization
 
 ### Customer role
